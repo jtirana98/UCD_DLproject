@@ -7,7 +7,14 @@ import cnn_model
 def main():
     preprocessing = str(input('Preprocess data?[y/n]: '))
     if preprocessing == 'y':
-        data_preprocessing.prepare()
+        source_dir = str(input('Print source directory or [Enter] to get the default'))
+        if source_dir == '':
+            source_dir = 'data/archive'
+
+        dest_dir = str(input('Print destination directory or [Enter] to get the default'))
+        if dest_dir == '':
+            dest_dir = 'data/clean_archive'
+        data_preprocessing.prepare(source_dir, dest_dir)
     elif preprocessing != 'n':
         print('Invalid anwser')
         return
@@ -27,7 +34,10 @@ def main():
         return
     
     if model == 'cnn':
-        cnn_model.start_training(embedding)
+        if dest_dir == '':
+            cnn_model.start_training(embedding)
+        else:
+            cnn_model.start_training(embedding, dest_dir)
     #else:
     #    rnn_model.start_training(embedding)
 

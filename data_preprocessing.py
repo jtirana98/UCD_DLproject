@@ -70,11 +70,11 @@ def clean_data(data_to_process, addPadding=True, isLabel=False, min_len=5):
 
 
 
-def main():
+def prepare(source_dir, dest_dir):
+    
     #source_file_clean = 'data/clean/dataset(clean).csv'
-    source_dir = input('Print source directory or [Enter] to get the default')
-    dest_dir = input('Print destination directory or [Enter] to get the default')
-    add_padding = input('Add padding? [y/n]')
+    
+    add_padding = str(input('Add padding? [y/n]'))
     min_len = ''
     
     if add_padding == 'y':
@@ -85,12 +85,6 @@ def main():
 
     if min_len == '':
         min_len = 5
-    
-    if source_dir == '':
-        source_dir = 'data/archive'
-
-    if dest_dir == '':
-        dest_dir = 'data/clean_archive'
 
     source_file_train = f'{source_dir}/Corona_NLP_train.csv'
     source_file_test = f'{source_dir}/Corona_NLP_test.csv'
@@ -128,6 +122,16 @@ def main():
     # write new data
     df_train.to_csv(f'{dest_dir}/train.csv')
     df_test.to_csv(f'{dest_dir}/test.csv')
+
+def main():
+    source_dir = str(input('Print source directory or [Enter] to get the default'))
+    if source_dir == '':
+        source_dir = 'data/archive'
+
+    dest_dir = str(input('Print destination directory or [Enter] to get the default'))
+    if dest_dir == '':
+        dest_dir = 'data/clean_archive'
+    prepare(source_dir, dest_dir) # let's make it modular
 
 if __name__ == '__main__': 
     main()

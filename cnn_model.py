@@ -10,6 +10,7 @@ from transformers import BertTokenizer
 from transformers import BertTokenizer, BertModel
 import functions
 
+
 class CNN(nn.Module):
     def __init__(self, vocab_size, embedding_dim, n_filters, filter_sizes, output_dim, 
                  dropout, pad_idx):
@@ -59,9 +60,6 @@ class CNN_bert(nn.Module):
         return self.fc(cat)
 
 def start_training(embeddings=False, data_path='../data/clean_archive'):
-    if embeddings:
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        max_input_length = tokenizer.max_model_input_sizes['bert-base-uncased']
     
     SEED = 1234
     random.seed(SEED)
@@ -70,21 +68,8 @@ def start_training(embeddings=False, data_path='../data/clean_archive'):
     torch.backends.cudnn.deterministic = True
 
     if embeddings:
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        init_token_idx = tokenizer.cls_token_id
-        eos_token_idx = tokenizer.sep_token_id
-        pad_token_idx = tokenizer.pad_token_id
-        unk_token_idx = tokenizer.unk_token_id
+        data_train, data_test, output_dim = functions.init_bert(f'{data_path}/train.csv')
 
-        ID = data.LabelField(dtype = torch.float) # ignore
-        TEXT = data.Field(batch_first = True,
-                        use_vocab = False,
-                        tokenize = function.tokenize_and_cut,
-                        preprocessing = tokenizer.convert_tokens_to_ids,
-                        init_token = init_token_idx,
-                        eos_token = eos_token_idx,
-                        pad_token = pad_token_idx,
-                        unk_token = unk_token_idx)
     else:
         ID = data.LabelField(dtype = torch.float) # ignore
         TEXT = data.Field(tokenize = 'spacy',
@@ -92,24 +77,23 @@ def start_training(embeddings=False, data_path='../data/clean_archive'):
                         batch_first = True)
 
 
-    LABEL = data.LabelField()
+        LABEL = data.LabelField()
 
-    # Load  data
-    data_train = data.TabularDataset(
-                    path=f'{data_path}/train.csv', format='csv',
-                        skip_header = True,
-                        fields=[
-                            ('ID', None),
-                            ('TEXT', TEXT),
-                            ('LABEL', LABEL)])
+        data_train = data.TabularDataset(
+                        path=f'{data_path}/train.csv', format='csv',
+                            skip_header = True,
+                            fields=[
+                                ('ID', None),
+                                ('TEXT', TEXT),
+                                ('LABEL', LABEL)])
 
-    data_test = data.TabularDataset(
-                    path=f'{data_path}/test.csv', format='csv',
-                        skip_header = True,
-                        fields=[
-                            ('ID', None),
-                            ('TEXT', TEXT),
-                            ('LABEL', LABEL)])
+        data_test = data.TabularDataset(
+                        path=f'{data_path}/test.csv', format='csv',
+                            skip_header = True,
+                            fields=[
+                                ('ID', None),
+                                ('TEXT', TEXT),
+                                ('LABEL', LABEL)])
 
     data_train, valid_train = data_train.split(random_state = random.seed(SEED))
 
@@ -121,7 +105,7 @@ def start_training(embeddings=False, data_path='../data/clean_archive'):
                         unk_init = torch.Tensor.normal_)
         print(f"Unique tokens in TEXT vocabulary: {len(TEXT.vocab)}")
     
-    LABEL.build_vocab(data_train)
+        LABEL.build_vocab(data_train)
     BATCH_SIZE = 64
 
     train_iterator, valid_iterator, test_iterator = data.BucketIterator.splits(
@@ -136,7 +120,6 @@ def start_training(embeddings=False, data_path='../data/clean_archive'):
         bert = BertModel.from_pretrained('bert-base-uncased')
         n_filters = 100
         filter_sizes = [2,3,4]
-        output_dim = len(LABEL.vocab)
         dropout = 0.5
 
         model = CNN_bert(n_filters, filter_sizes, output_dim, dropout, bert)
@@ -167,7 +150,8 @@ def start_training(embeddings=False, data_path='../data/clean_archive'):
 
    
     count_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"The model has {count_params} trainable parameters")
+    if not embeddings:
+        print(f"The model has {count_params} trainable parameters")
 
     optimizer = optim.Adam(model.parameters())
     criterion = nn.CrossEntropyLoss()
@@ -187,7 +171,7 @@ def start_training(embeddings=False, data_path='../data/clean_archive'):
     
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
-            torch.save(model.state_dict(), 'tut5-model.pt')
+            torch.save(model.state_dict(), 'tut-cnn-model.pt')
     
         print(f'Epoch: {epoch+1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
         print(f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}%')
@@ -195,7 +179,7 @@ def start_training(embeddings=False, data_path='../data/clean_archive'):
         #history_loss.append(f'{valid_loss:.3f}')
         #history_acc.append(f'{valid_acc*100:.2f}')
     
-    model.load_state_dict(torch.load('tut5-model.pt'))
+    model.load_state_dict(torch.load('tut-cnn-model.pt'))
     test_loss, test_acc = functions.evaluate(model, test_iterator, criterion, True)
     print(f'Test Loss: {test_loss:.3f} | Test Acc: {test_acc*100:.2f}%')
     #print(history_loss)

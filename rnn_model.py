@@ -126,7 +126,7 @@ def generate_bigrams(x):
     return x
 
 def start_training(embeddings=False, type='lstm', data_path='../data/clean_archive'):
-    undersampling = str(input('Apply downsampling[y/n]? '))
+    undersampling = str(input('Apply Undersampling[y/n]? '))
     if undersampling == 'y':
         undersampling = True
     elif undersampling == 'n':
@@ -134,10 +134,7 @@ def start_training(embeddings=False, type='lstm', data_path='../data/clean_archi
     else:
         print('Invalid anwser')
         return
-    
-    if embeddings:
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        max_input_length = tokenizer.max_model_input_sizes['bert-base-uncased']
+
     
     SEED = 1234
     random.seed(SEED)
@@ -146,21 +143,7 @@ def start_training(embeddings=False, type='lstm', data_path='../data/clean_archi
     torch.backends.cudnn.deterministic = True
 
     if embeddings:
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        init_token_idx = tokenizer.cls_token_id
-        eos_token_idx = tokenizer.sep_token_id
-        pad_token_idx = tokenizer.pad_token_id
-        unk_token_idx = tokenizer.unk_token_id
-
-        ID = data.LabelField(dtype = torch.float) # ignore
-        TEXT = data.Field(batch_first = True,
-                        use_vocab = False,
-                        tokenize = function.tokenize_and_cut,
-                        preprocessing = tokenizer.convert_tokens_to_ids,
-                        init_token = init_token_idx,
-                        eos_token = eos_token_idx,
-                        pad_token = pad_token_idx,
-                        unk_token = unk_token_idx)
+        data_train, data_test, output_dim = functions.init_bert(f'{data_path}/train.csv')
     else:
         ID = data.LabelField(dtype = torch.float) # ignore
         TEXT = data.Field(tokenize='spacy',
@@ -169,25 +152,25 @@ def start_training(embeddings=False, type='lstm', data_path='../data/clean_archi
                           batch_first=True,
                           include_lengths=True)
 
-    LABEL = data.LabelField()
+        LABEL = data.LabelField()
 
 
-    # Load  data
-    data_train = data.TabularDataset(
-                    path=f'{data_path}/train.csv', format='csv',
-                        skip_header = True,
-                        fields=[
-                            ('ID', None),
-                            ('TEXT', TEXT),
-                            ('LABEL', LABEL)])
+        # Load  data
+        data_train = data.TabularDataset(
+                        path=f'{data_path}/train.csv', format='csv',
+                            skip_header = True,
+                            fields=[
+                                ('ID', None),
+                                ('TEXT', TEXT),
+                                ('LABEL', LABEL)])
 
-    data_test = data.TabularDataset(
-                    path=f'{data_path}/test.csv', format='csv',
-                        skip_header = True,
-                        fields=[
-                            ('ID', None),
-                            ('TEXT', TEXT),
-                            ('LABEL', LABEL)])
+        data_test = data.TabularDataset(
+                        path=f'{data_path}/test.csv', format='csv',
+                            skip_header = True,
+                            fields=[
+                                ('ID', None),
+                                ('TEXT', TEXT),
+                                ('LABEL', LABEL)])
 
     data_train, valid_train = data_train.split(random_state = random.seed(SEED))
 
@@ -220,7 +203,7 @@ def start_training(embeddings=False, type='lstm', data_path='../data/clean_archi
                         unk_init = torch.Tensor.normal_)
         print(f"Unique tokens in TEXT vocabulary: {len(TEXT.vocab)}")
     
-    LABEL.build_vocab(data_train)
+        LABEL.build_vocab(data_train)
     BATCH_SIZE = 64
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -237,7 +220,6 @@ def start_training(embeddings=False, type='lstm', data_path='../data/clean_archi
     input_dim = len(TEXT.vocab)
     embedding_dim = 100
     hidden_dim = 256
-    output_dim = len(LABEL.vocab)
     n_layers = 2
     bidirectional = True
     dropout = 0.25
@@ -245,6 +227,7 @@ def start_training(embeddings=False, type='lstm', data_path='../data/clean_archi
         bert = BertModel.from_pretrained('bert-base-uncased')
     else:
         pad_idx = TEXT.vocab.stoi[TEXT.pad_token]
+        output_dim = len(LABEL.vocab)
     
     if type == 'lstm':
         if embeddings:
@@ -286,7 +269,7 @@ def start_training(embeddings=False, type='lstm', data_path='../data/clean_archi
     model = model.to(device)
     criterion = criterion.to(device)
 
-    n_epochs = 30
+    n_epochs = 1
     best_valid_loss = float('inf')
     history_loss = []
     history_acc = []
@@ -301,7 +284,7 @@ def start_training(embeddings=False, type='lstm', data_path='../data/clean_archi
     
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
-            torch.save(model.state_dict(), f'model{type}-model.pt')
+            torch.save(model.state_dict(), f'model-{type}-model.pt')
     
         print(f'Epoch: {epoch+1:02} | Epoch Time: {epoch_mins}m {epoch_secs}s')
         print(f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc*100:.2f}%')
@@ -309,7 +292,7 @@ def start_training(embeddings=False, type='lstm', data_path='../data/clean_archi
         history_loss.append(f'{valid_loss:.3f}')
         history_acc.append(f'{valid_acc*100:.2f}')
     
-    model.load_state_dict(torch.load(f'model{type}-model.pt'))
+    model.load_state_dict(torch.load(f'model-{type}-model.pt'))
     test_loss, test_acc = functions.evaluate(model, test_iterator, criterion, True, type='rnn')
     print(f'Test Loss: {test_loss:.3f} | Test Acc: {test_acc*100:.2f}%')
 

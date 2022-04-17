@@ -1,10 +1,8 @@
 import pandas as pd
-import matplotlib.pyplot as plt
 import spacy
 import re
 import gensim
-import nltk
-from nltk.tokenize.treebank import TreebankWordTokenizer, TreebankWordDetokenizer
+from nltk.tokenize.treebank import TreebankWordDetokenizer
 
 nlp = spacy.load('en_core_web_sm')
 
@@ -78,7 +76,7 @@ def prepare(source_dir, dest_dir):
     min_len = ''
     
     if add_padding == 'y':
-        min_len = input('Give minmum len of sentence or [Enter] to get the default: ')
+        min_len = input('Give minmum length of sentence or [Enter] to get the default(5): ')
         add_padding = True
     else:
         add_padding = False
@@ -134,7 +132,7 @@ def main():
     dest_dir = str(input('Print destination directory or [Enter] to get the default'))
     if dest_dir == '':
         dest_dir = '../data/clean_archive'
-    prepare(source_dir, dest_dir) # let's make it modular
+    prepare(source_dir, dest_dir)
 
 if __name__ == '__main__': 
     main()

@@ -1,4 +1,7 @@
 import torch
+from torchtext.legacy import data
+from transformers import BertTokenizer
+from transformers import BertTokenizer, BertModel
 
 
 '''
@@ -7,6 +10,62 @@ import torch
 
 results = {0: [0,0,0], 1: [0,0,0], 2: [0,0,0],
                3: [0,0,0], 4: [0,0,0]} #[target true, predicted true, correct true]
+
+
+
+
+def init_bert(path):
+
+    global tokenizer
+    global max_input_length
+    global init_token_idx
+    global eos_token_idx
+    global pad_token_idx
+    global unk_token_idx
+
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    max_input_length = tokenizer.max_model_input_sizes['bert-base-uncased'] 
+    init_token_idx = tokenizer.cls_token_id
+    eos_token_idx = tokenizer.sep_token_id
+    pad_token_idx = tokenizer.pad_token_id
+    unk_token_idx = tokenizer.unk_token_id
+
+    ID = data.LabelField(dtype = torch.float) # ignore
+    TEXT = data.Field(batch_first = True,
+                use_vocab = False,
+                tokenize = tokenize_and_cut,
+                preprocessing = tokenizer.convert_tokens_to_ids,
+                init_token = init_token_idx,
+                eos_token = eos_token_idx,
+                pad_token = pad_token_idx,
+                unk_token = unk_token_idx)
+
+    LABEL = data.LabelField()
+
+    data_train = data.TabularDataset(
+                            path=path, format='csv',
+                            skip_header = True,
+                            fields=[
+                                ('ID', None),
+                                ('TEXT', TEXT),
+                                ('LABEL', LABEL)])
+
+    data_test = data.TabularDataset(
+                        path=path, format='csv',
+                        skip_header = True,
+                        fields=[
+                            ('ID', None),
+                            ('TEXT', TEXT),
+                            ('LABEL', LABEL)])
+    
+    LABEL.build_vocab(data_train)
+    output_dim = len(LABEL.vocab)
+    return (data_train, data_test, output_dim)
+
+def tokenize_and_cut(sentence):
+    tokens = tokenizer.tokenize(sentence) 
+    tokens = tokens[:max_input_length-2]
+    return tokens
 
 def categorical_accuracy(preds, y, calculate=False):
     """
@@ -98,8 +157,3 @@ def epoch_time(start_time, end_time):
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-def tokenize_and_cut(sentence, tokenizer, max_input_length):
-    tokens = tokenizer.tokenize(sentence) 
-    tokens = tokens[:max_input_length-2]
-    return tokens
